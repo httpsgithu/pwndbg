@@ -1,4 +1,5 @@
-# pwndbg [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/pwndbg/pwndbg/blob/dev/LICENSE.md) [![Py2&3](https://img.shields.io/badge/Python-2%20%26%203-green.svg)]() [![IRC](https://img.shields.io/badge/freenode-%23pwndbg-red.svg)](https://webchat.freenode.net/?channels=#pwndbg)
+
+![pwndbg](assets/logo.png)
 
 `pwndbg` (/poʊndbæg/) is a GDB plug-in that makes debugging with GDB suck less, with a focus on features needed by low-level software developers, hardware hackers, reverse-engineers and exploit developers.
 
@@ -27,7 +28,7 @@ Pwndbg exists not only to replace all of its predecessors, but also to have a cl
 
 ## How?
 
-Installation is straightforward.  Pwndbg is best supported on Ubuntu 14.04 with GDB 7.7, and Ubuntu 16.04 with GDB 7.11.  
+Installation is straightforward. Pwndbg is best supported on Ubuntu 22.04 or 24.04 and GDB >= 12.1.
 
 ```shell
 git clone https://github.com/pwndbg/pwndbg
@@ -49,5 +50,4 @@ Want to help with development? Read [CONTRIBUTING](https://github.com/pwndbg/pwn
 
 ## Contact
 If you have any questions not worthy of a [bug report](https://github.com/pwndbg/pwndbg/issues), feel free to ping
-[`ebeip90` or `disconnect3d` at #pwndbg on Freenode](irc://irc.freenode.net/pwndbg) and ask away.
-Click [here](https://kiwiirc.com/client/irc.freenode.net/pwndbg) to connect.
+anybody on [Discord](https://discord.gg/x47DssnGwm) and ask away.

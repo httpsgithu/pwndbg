@@ -1,11 +1,10 @@
-import gdb
+from __future__ import annotations
 
-import pwndbg.elf
-import pwndbg.memoize
+import pwndbg.aglib.elf
+import pwndbg.lib.cache
 
 
-@pwndbg.memoize.reset_on_start
-@pwndbg.memoize.reset_on_objfile
+@pwndbg.lib.cache.cache_until("start", "objfile")
 def r2pipe():
     """
     Spawn and return a r2pipe handle for the current process file.
@@ -20,14 +19,15 @@ def r2pipe():
 
     Returns a r2pipe.open handle.
     """
-    filename = gdb.current_progspace().filename
+    filename = pwndbg.dbg.selected_inferior().main_module_name()
     if not filename:
-        raise Exception('Could not find objfile to create a r2pipe for')
+        raise Exception("Could not find objfile to create a r2pipe for")
 
     import r2pipe
-    flags = ['-e', 'io.cache=true']
-    if pwndbg.elf.get_elf_info(filename).is_pie and pwndbg.elf.exe():
-        flags.extend(['-B', hex(pwndbg.elf.exe().address)])
+
+    flags = ["-e", "io.cache=true"]
+    if pwndbg.aglib.elf.get_elf_info(filename).is_pie and pwndbg.aglib.elf.exe():
+        flags.extend(["-B", hex(pwndbg.aglib.elf.exe().address)])
     r2 = r2pipe.open(filename, flags=flags)
     r2.cmd("aaaa")
     return r2

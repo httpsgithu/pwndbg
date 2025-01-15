@@ -1,71 +1,129 @@
-import pwndbg.color.theme as theme
-import pwndbg.config as config
-import pwndbg.vmmap
-from pwndbg.color import generateColorFunction
+from __future__ import annotations
+
+from typing import Any
+from typing import Callable
+
+import pwndbg.integration
+from pwndbg.color import ColorConfig
+from pwndbg.color import ColorParamSpec
 from pwndbg.color import normal
 
-config_stack  = theme.ColoredParameter('memory-stack-color', 'yellow', 'color for stack memory')
-config_heap   = theme.ColoredParameter('memory-heap-color', 'blue', 'color for heap memory')
-config_code   = theme.ColoredParameter('memory-code-color', 'red', 'color for executable memory')
-config_data   = theme.ColoredParameter('memory-data-color', 'purple', 'color for all other writable memory')
-config_rodata = theme.ColoredParameter('memory-rodata-color', 'normal', 'color for all read only memory')
-config_rwx    = theme.ColoredParameter('memory-rwx-color', 'underline', 'color added to all RWX memory')
+ColorFunction = Callable[[str], str]
 
-def stack(x):
-    return generateColorFunction(config.memory_stack_color)(x)
+c = ColorConfig(
+    "memory",
+    [
+        ColorParamSpec("stack", "yellow", "color for stack memory"),
+        ColorParamSpec("heap", "blue", "color for heap memory"),
+        ColorParamSpec("code", "red", "color for executable memory"),
+        ColorParamSpec("data", "purple", "color for all other writable memory"),
+        ColorParamSpec("rodata", "normal", "color for all read only memory"),
+        ColorParamSpec("wx", "underline", "color added to all WX memory"),
+        ColorParamSpec("guard", "cyan", "color added to all guard pages (no perms)"),
+    ],
+)
 
-def heap(x):
-    return generateColorFunction(config.memory_heap_color)(x)
 
-def code(x):
-    return generateColorFunction(config.memory_code_color)(x)
+def get_address_and_symbol(address: int) -> str:
+    """
+    Convert and colorize address 0x7ffff7fcecd0 to string `0x7ffff7fcecd0 (_dl_fini)`
+    If no symbol exists for the address, return colorized address
+    """
+    symbol = pwndbg.aglib.symbol.resolve_addr(address)
+    if symbol:
+        symbol = f"{address:#x} ({symbol})"
+    else:
+        page = pwndbg.aglib.vmmap.find(address)
+        if page and "[stack" in page.objfile:
+            var = pwndbg.integration.provider.get_stack_var_name(address)
+            if var:
+                symbol = f"{address:#x} {{{var}}}"
+    return get(address, symbol)
 
-def data(x):
-    return generateColorFunction(config.memory_data_color)(x)
 
-def rodata(x):
-    return generateColorFunction(config.memory_rodata_color)(x)
+def get_address_or_symbol(address: int) -> str:
+    """
+    Convert and colorize address to symbol if it can be resolved, else return colorized address
+    """
+    return attempt_colorized_symbol(address) or get(address)
 
-def rwx(x):
-    return generateColorFunction(config.memory_rwx_color)(x)
 
-def get(address, text = None):
+def attempt_colorized_symbol(address: int) -> str | None:
+    """
+    Convert address to colorized symbol (if symbol is there), else None
+    """
+    symbol = pwndbg.aglib.symbol.resolve_addr(address)
+    if symbol:
+        return get(address, symbol)
+    else:
+        page = pwndbg.aglib.vmmap.find(address)
+        if page and "[stack" in page.objfile:
+            var = pwndbg.integration.provider.get_stack_var_name(address)
+            if var:
+                return get(address, f"{{{var}}}")
+    return None
+
+
+# We have to accept `Any` here, as users may pass gdb.Value objects to this
+# function. This is probably more lenient than we'd really like.
+#
+# TODO: Remove the exception for gdb.Value case from `pwndbg.color.memory.get`.
+def get(
+    address: int | pwndbg.dbg_mod.Value | Any, text: str | None = None, prefix: str | None = None
+) -> str:
     """
     Returns a colorized string representing the provided address.
 
     Arguments:
-        address(int): Address to look up
-        text(str): Optional text to use in place of the address
-              in the return value string.
+        address(int | pwndbg.dbg_mod.Value): Address to look up
+        text(str | None): Optional text to use in place of the address in the return value string.
+        prefix(str | None): Optional text to set at beginning in the return value string.
     """
     address = int(address)
+    page = pwndbg.aglib.vmmap.find(address)
 
-    page = pwndbg.vmmap.find(int(address))
+    color: Callable[[str], str]
 
-    if page is None:                 color = normal
-    elif '[stack' in page.objfile:   color = stack
-    elif '[heap'  in page.objfile:   color = heap
-    elif page.execute:               color = code
-    elif page.rw:                    color = data
-    else:                            color = rodata
+    if page is None:
+        color = normal
+    elif "[stack" in page.objfile:
+        color = c.stack
+    elif "[heap" in page.objfile:
+        color = c.heap
+    elif page.execute:
+        color = c.code
+    elif page.rw:
+        color = c.data
+    elif page.is_guard:
+        color = c.guard
+    else:
+        color = c.rodata
 
-    if page and page.rwx:
+    if page and page.wx:
         old_color = color
-        color = lambda x: rwx(old_color(x))
+        color = lambda x: c.wx(old_color(x))
 
     if text is None and isinstance(address, int) and address > 255:
         text = hex(int(address))
     if text is None:
         text = str(int(address))
 
+    if prefix:
+        # Replace first N characters with the provided prefix
+        text = prefix + text[len(prefix) :]
+
     return color(text)
 
+
 def legend():
-    return 'LEGEND: ' + ' | '.join((
-        stack('STACK'),
-        heap('HEAP'),
-        code('CODE'),
-        data('DATA'),
-        rwx('RWX'),
-        rodata('RODATA')
-    ))
+    return "LEGEND: " + " | ".join(
+        (
+            c.stack("STACK"),
+            c.heap("HEAP"),
+            c.code("CODE"),
+            c.data("DATA"),
+            # WX segments will also be marked as code, so do 2 formatters here
+            c.wx(c.code("WX")),
+            c.rodata("RODATA"),
+        )
+    )

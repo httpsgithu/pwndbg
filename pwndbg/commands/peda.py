@@ -1,53 +1,54 @@
+from __future__ import annotations
+
 import argparse
 
 import gdb
 
+import pwndbg.aglib.memory
+import pwndbg.aglib.proc
 import pwndbg.auxv
-import pwndbg.color.message as message
 import pwndbg.commands
 import pwndbg.commands.context
 import pwndbg.commands.telescope
-import pwndbg.proc
+from pwndbg.color import message
+from pwndbg.commands import CommandCategory
 
 
 @pwndbg.commands.ArgparsedCommand("Gets the current file.")
 @pwndbg.commands.OnlyWhenRunning
-def getfile():
+def getfile() -> None:
     print(repr(pwndbg.auxv.get().AT_EXECFN))
 
-@pwndbg.commands.ArgparsedCommand("Get the pid.")
-@pwndbg.commands.OnlyWhenRunning
-def getpid():
-    print(pwndbg.proc.pid)
+
+parser = argparse.ArgumentParser(description="Continue execution until an address or expression.")
+parser.add_argument("target", type=int, help="Location to stop execution at")
 
 
-parser = argparse.ArgumentParser(description='Continue execution until an address or function.')
-parser.add_argument('target', type=str, help='Address or function to stop execution at')
-
-@pwndbg.commands.ArgparsedCommand(parser)
-def xuntil(target):
+@pwndbg.commands.ArgparsedCommand(parser, category=CommandCategory.NEXT)
+def xuntil(target) -> None:
     try:
-        addr = int(target,0)
-        
-        if not pwndbg.memory.peek(addr):
-            print(message.error('Invalid address %#x' % addr))
+        addr = target
+
+        if not pwndbg.aglib.memory.peek(addr):
+            print(message.error("Invalid address %#x" % addr))
             return
 
         spec = "*%#x" % (addr)
     except (TypeError, ValueError):
-        #The following gdb command will throw an error if the symbol is not defined.
+        # The following gdb command will throw an error if the symbol is not defined.
         try:
-            result = gdb.execute('info address %s' % target, to_string=True, from_tty=False)
+            gdb.execute(f"info address {target}", to_string=True, from_tty=False)
         except gdb.error:
-            print(message.error("Unable to resolve %s" % target))
-            return    
+            print(message.error(f"Unable to resolve {target}"))
+            return
         spec = target
 
-    b = gdb.Breakpoint(spec, temporary=True)
-    if pwndbg.proc.alive:
+    gdb.Breakpoint(spec, temporary=True)
+    if pwndbg.aglib.proc.alive:
         gdb.execute("continue", from_tty=False)
     else:
         gdb.execute("run", from_tty=False)
+
 
 xinfo = pwndbg.commands.context.context
 xprint = pwndbg.commands.telescope.telescope

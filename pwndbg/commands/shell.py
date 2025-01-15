@@ -2,15 +2,17 @@
 Wrapper for shell commands.
 """
 
+from __future__ import annotations
+
 import os
 
-import gdb
+from pwnlib.util.misc import which
 
 import pwndbg.commands
-import pwndbg.which
+from pwndbg.commands import CommandCategory
 
-pwncmds = ["asm", "constgrep", "cyclic", "disasm", "pwn", "unhex"]
-shellcmds = [
+pwncmd_names = ["constgrep", "disasm", "pwn", "unhex"]
+shellcmd_names = [
     "awk",
     "bash",
     "cat",
@@ -62,25 +64,27 @@ shellcmds = [
     "zsh",
 ]
 
-pwncmds = filter(pwndbg.which.which, pwncmds)
-shellcmds = filter(pwndbg.which.which, shellcmds)
+pwncmds = list(filter(which, pwncmd_names))
+shellcmds = list(filter(which, shellcmd_names))
 
-def register_shell_function(cmd, deprecated=False):
-    def handler(*a):
+
+def register_shell_function(cmd, deprecated=False) -> None:
+    def handler(*a) -> None:
         if os.fork() == 0:
             os.execvp(cmd, (cmd,) + a)
         os.wait()
-        print("This command is deprecated in Pwndbg. Please use the GDB's built-in syntax for running shell commands instead: !%s <args>" % cmd)
+        print(
+            f"This command is deprecated in Pwndbg. Please use the GDB's built-in syntax for running shell commands instead: !{cmd} <args>"
+        )
 
-
-    doc = 'Invokes `{}` shell command'.format(cmd)
+    doc = f"Invokes `{cmd}` shell command"
     if deprecated:
-        doc += ' (deprecated)'
+        doc += " (deprecated)"
 
     handler.__name__ = str(cmd)
     handler.__doc__ = doc
 
-    pwndbg.commands.Command(handler, False)
+    pwndbg.commands.Command(handler, shell=True, category=CommandCategory.SHELL)
 
 
 for cmd in pwncmds:
