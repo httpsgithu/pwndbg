@@ -1,17 +1,18 @@
-import pwndbg.config
+from __future__ import annotations
+
+from typing import Any
+
+from pwndbg import config
+from pwndbg.lib.config import Parameter
 
 
-class Parameter(pwndbg.config.Parameter):
+class ColorParameter(Parameter):
+    pass
 
-    def __init__(self, name, default, docstring):
-        super(Parameter, self).__init__(name,
-                                        default,
-                                        docstring,
-                                        'theme')
 
-class ColoredParameter(Parameter):
+def add_param(name: str, default: Any, set_show_doc: str, color_param: bool = False) -> Parameter:
+    return config.add_param(name, default, set_show_doc, scope="theme")
 
-    def __init__(self, name, default, docstring):
-        super(ColoredParameter, self).__init__(name,
-                                               default,
-                                               docstring)
+
+def add_color_param(name: str, default: Any, set_show_doc: str) -> Parameter:
+    return config.add_param_obj(ColorParameter(name, default, set_show_doc, scope="theme"))

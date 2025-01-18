@@ -24,6 +24,8 @@ var/
 .installed.cfg
 *.egg
 
+!/pwndbg/lib/
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -37,6 +39,7 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
+.cov/
 .coverage
 .coverage.*
 .cache
@@ -53,6 +56,9 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+
+# mkdocs
+site/
 
 # PyBuilder
 target/
@@ -71,8 +77,23 @@ tests/**/binaries/*.out
 tests/**/binaries/gosample.x*
 tests/**/binaries/div_zero_binary/core
 tests/**/binaries/div_zero_binary/binary
+!tests/**/binaries/*.go
+
+# QEMU test images
+tests/qemu-tests/images
 
 # VS Code files
 .vscode/
 
 .zig/
+gdb.txt
+
+# venv
+.venv/
+
+# Nix build and dev shell
+result*
+.direnv/
+
+# Vim
+*.swp

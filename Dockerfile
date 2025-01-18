@@ -1,19 +1,23 @@
-# This dockerfile was created for development & testing purposes
+# This dockerfile was created for development & testing purposes, for APT-based distro.
 #
 # Build as:             docker build -t pwndbg .
 #
-# For testing use:      docker run --rm -it --cap-add=SYS_PTRACE pwndbg bash
+# For testing use:      docker run --rm -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwndbg bash
 #
 # For development, mount the directory so the host changes are reflected into container:
-#   docker run -it --cap-add=SYS_PTRACE -v `pwd`:/pwndbg pwndbg bash
+#   docker run -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -v `pwd`:/pwndbg pwndbg bash
 #
-FROM ubuntu:20.04
+
+ARG image=mcr.microsoft.com/devcontainers/base:jammy
+FROM $image
 
 WORKDIR /pwndbg
 
+ENV PIP_NO_CACHE_DIR=true
 ENV LANG en_US.utf8
 ENV TZ=America/New_York
 ENV ZIGPATH=/opt/zig
+ENV PWNDBG_VENV_PATH=/venv
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone && \
@@ -25,21 +29,31 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     apt-get install -y vim
 
 ADD ./setup.sh /pwndbg/
-ADD ./requirements.txt /pwndbg/
-# The `git submodule` is commented because it refreshes all the sub-modules in the project
-# but at this time we only need the essentials for the set up. It will execute at the end.
-RUN sed -i "s/^git submodule/#git submodule/" ./setup.sh && \
-    DEBIAN_FRONTEND=noninteractive ./setup.sh
+ADD ./poetry.lock /pwndbg/
+ADD ./pyproject.toml /pwndbg/
+ADD ./poetry.toml /pwndbg/
+
+# pyproject.toml requires these files, pip install would fail
+RUN touch README.md && mkdir pwndbg && touch pwndbg/empty.py
+
+RUN DEBIAN_FRONTEND=noninteractive ./setup.sh
 
 # Comment these lines if you won't run the tests.
-ADD ./setup-test-tools.sh /pwndbg/
-RUN ./setup-test-tools.sh
+ADD ./setup-dev.sh /pwndbg/
+RUN ./setup-dev.sh
 
-RUN echo "source /pwndbg/gdbinit.py" >> ~/.gdbinit.py && \
-    echo "PYTHON_MINOR=$(python3 -c "import sys;print(sys.version_info.minor)")" >> /root/.bashrc && \
-    echo "PYTHON_PATH=\"/usr/local/lib/python3.${PYTHON_MINOR}/dist-packages/bin\"" >> /root/.bashrc && \
-    echo "export PATH=$PATH:$PYTHON_PATH" >> /root/.bashrc
+# Cleanup dummy files
+RUN rm README.md && rm -rf pwndbg
 
 ADD . /pwndbg/
 
-RUN git submodule update --init --recursive
+ARG LOW_PRIVILEGE_USER="vscode"
+
+ENV PATH="${PWNDBG_VENV_PATH}/bin:${PATH}"
+
+# Add .gdbinit to the home folder of both root and vscode users (if vscode user exists)
+# This is useful for a VSCode dev container, not really for test builds
+RUN if [ ! -f ~/.gdbinit ]; then echo "source /pwndbg/gdbinit.py" >> ~/.gdbinit; fi && \
+    if id -u ${LOW_PRIVILEGE_USER} > /dev/null 2>&1; then \
+        su ${LOW_PRIVILEGE_USER} -c 'if [ ! -f ~/.gdbinit ]; then echo "source /pwndbg/gdbinit.py" >> ~/.gdbinit; fi'; \
+    fi
